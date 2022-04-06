@@ -71,11 +71,20 @@ export class UserService {
   }
 
   findOne(id: number): Observable<User> {
-    return from(this.userRepository.findOne(id));
+    return from(this.userRepository.findOne(id))
   }
 
    findUserByEmail(email: string): Observable<User> {
     return from(this.userRepository.findOne({ email }, { select: ['id', 'email', 'firstName', 'password','lastName','role'] }));
+  }
+
+  async update(user:Partial<User>, attrs: Partial<User>) {
+    const user1 = user
+    // if (!user) {
+    //   throw new NotFoundException('user not found');
+    // }
+    Object.assign(user, attrs);
+    return this.userRepository.save(user);
   }
 
 
