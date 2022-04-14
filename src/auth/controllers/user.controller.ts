@@ -25,13 +25,10 @@ import { UpdateUserDto } from '../models/update-user.dto';
 export class UserController {
   constructor(private userService: UserService) {}
 
-  // Rest Call: POST http://localhost:8080/api/users/
   @Post('register')
-  create(@Body() createdUserDto: CreateUserDto): Observable<User> {
+  create(@Body() createdUserDto: CreateUserDto): Promise<User> {
     return this.userService.create(createdUserDto);
   }
-
-  // Rest Call: POST http://localhost:8080/api/users/login
 
   @UseGuards(LocalAuthGuard)
   @Post('login2')
@@ -42,17 +39,15 @@ export class UserController {
 
   @Post('login')
   @HttpCode(200)
-  login(@Body() loginUserDto: LoginUserDto): Observable<Object> {
-    return this.userService.login(loginUserDto).pipe(
-      map((jwt: string) => {
-        return {
-          access_token: jwt,
-          token_type: 'JWT',
-          signOptions: { expiresIn: '1000s' },
-        };
-      }),
-    );
+  async login(@Body() loginUserDto: LoginUserDto): Promise<Object> {
+    const jwt = await this.userService.login(loginUserDto)
+    return {
+      access_token: jwt,
+      token_type: 'JWT',
+      signOptions: { expiresIn: '1000s' },
+    }
   }
+
 
   @UseGuards(JwtGuard)
   @Get('/:id')
@@ -73,7 +68,7 @@ export class UserController {
 
   @UseGuards(JwtGuard)
   @Get('all-users')
-  findAll(@Req() request): Observable<User[]> {
+  findAll(@Req() request): Promise<User[]> {
     return this.userService.findAll();
   }
 

@@ -1,13 +1,11 @@
-import { map, switchMap } from 'rxjs/operators';
+import { LoginUserDto } from './../models/dtos/LoginUser.dto';
 import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { from, Observable } from 'rxjs';
 import { Repository } from 'typeorm';
 import { UserEntity } from '../models/user.entity';
 import { User } from '../models/user.interface';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from '../models/dtos/CreateUser.dto';
-import { LoginUserDto } from '../models/dtos/LoginUser.dto';
 
 @Injectable()
 export class UserService {
@@ -18,91 +16,68 @@ export class UserService {
     private authService: AuthService
   ) { }
 
-  create(createdUserDto: CreateUserDto): Observable<User> {
-    const userEntity = this.userRepository.create(createdUserDto);
+  
 
-    return this.mailExists(userEntity.email).pipe(
-      switchMap((exists: boolean) => {
-        if (!exists) {
-          return this.authService.hashPassword(userEntity.password).pipe(
-            switchMap((passwordHash: string) => {
-              // Overwrite the user password with the hash, to store it in the db
-              userEntity.password = passwordHash;
-              return from(this.userRepository.save(userEntity)).pipe(
-                map((savedUser: User) => {
-                  const { password, ...user } = savedUser;
-                  return user;
-                })
-              )
-            })
-          )
-        } else {
-          throw new HttpException('Email already in use', HttpStatus.CONFLICT);
-        }
-      })
-    )
-  }
-
-  login(loginUserDto: LoginUserDto) {
-    return this.findUserByEmail(loginUserDto.email.toLowerCase()).pipe(
-      switchMap((user: User) => {
-        if (user) {
-          return this.validatePassword(loginUserDto.password, user.password).pipe(
-            switchMap((passwordsMatches) => {
-              if (passwordsMatches) {
-                return this.findOne(user.id).pipe(
-                  switchMap((user: User) => this.authService.generateJwt(user))
-                )
-              } else {
-                throw new HttpException('Login was not Successfulll', HttpStatus.UNAUTHORIZED);
-              }
-            })
-          )
-        } else {
-          throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-        }
+   async create(createdUserDto: CreateUserDto): Promise<any> {
+     const mailExist = await this.mailExists(createdUserDto.email);
+     if (!mailExist) {
+      const userEntity = await this.userRepository.create(createdUserDto);
+      const passwordHashed = await this.authService.hashPassword(userEntity.password)
+      userEntity.password = passwordHashed;
+      const savedUser = await this.userRepository.save(userEntity)
+      const {password, ...user} = savedUser
+      return user
+    }
+    else {
+        throw new HttpException('Email already in use', HttpStatus.CONFLICT);
       }
-      )
-    )
   }
 
-  findAll(): Observable<User[]> {
-    return from(this.userRepository.find());
+  async login(loginUserDto:LoginUserDto){
+    const user = await this.findUserByEmail(loginUserDto.email.toLowerCase())
+
+    if(user){
+      const passwordsMatches = await this.validatePassword(loginUserDto.password, user.password)
+      if(passwordsMatches){
+        const findeduser = await this.findOne(user.id)
+        return await this.authService.generateJwt(findeduser)
+      }
+    } else{
+      throw new HttpException('Email not found', HttpStatus.NOT_FOUND);
+    }
   }
 
-  findOne(id: number): Observable<User> {
-    return from(this.userRepository.findOne(id))
+  async findAll(): Promise<User[]> {
+    return await this.userRepository.find()
   }
 
-   findUserByEmail(email: string): Observable<User> {
-    return from(this.userRepository.findOne({ email }, { select: ['id', 'email', 'firstName', 'password','lastName','role'] }));
+  async findOne(id: number): Promise<User> {
+    return await this.userRepository.findOne(id)
+  }
+
+   async findUserByEmail(email: string): Promise<User> {
+    const user = await this.userRepository.findOne({ email }, { select: ['id', 'email', 'firstName', 'password','lastName','role'] });
+    return user
   }
 
   async update(user:Partial<User>, attrs: Partial<User>) {
-    const user1 = user
-    // if (!user) {
-    //   throw new NotFoundException('user not found');
-    // }
     Object.assign(user, attrs);
     return this.userRepository.save(user);
   }
 
 
-  private validatePassword(password: string, storedPasswordHash: string): Observable<User> {
-    return this.authService.comparePasswords(password, storedPasswordHash);
+  private validatePassword(password: string, storedPasswordHash: string): Promise<User> {
+    return  this.authService.comparePasswords(password, storedPasswordHash);
   }
 
-  private mailExists(email: string): Observable<boolean> {
+  private async mailExists(email: string): Promise<boolean> {
     email = email.toLowerCase();
-    return from(this.userRepository.findOne({ email })).pipe(
-      map((user: User) => {
+    const user = await this.userRepository.findOne({ email })
         if (user) {
           return true;
         } else {
           return false;
         }
-      })
-    )
   }
 
 }

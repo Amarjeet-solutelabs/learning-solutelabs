@@ -8,17 +8,17 @@ import { User } from '../models/user.interface';
 export class AuthService {
   constructor(private jwtService: JwtService) {}
 
-  hashPassword(password: string): Observable<string> {
-    return from(bcrypt.hash(password, 12));
+  hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, 12);
   }
-  generateJwt(user: User): Observable<string> {
-    return from(this.jwtService.signAsync({ user }));
+  async generateJwt(user: User): Promise<string> {
+    return await this.jwtService.signAsync({ user })
   }
 
-  comparePasswords(
+  async comparePasswords(
     password: string,
     storedPasswordHash: string,
-  ): Observable<any> {
-    return from(bcrypt.compare(password, storedPasswordHash))
+  ): Promise<any> {
+    return await bcrypt.compare(password, storedPasswordHash)
   }
 }
